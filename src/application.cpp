@@ -2,6 +2,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+//#include <GL/glew.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -18,6 +19,8 @@
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+
+#include "scenes/SceneClearColor.h"
 
 const int WIDTH = 1200;
 const int HEIGHT = 720;
@@ -77,15 +80,15 @@ int main(void)
 	}
 
 	//glm::mat4 proj = glm::ortho(-2.5f, 2.5f, -1.5f, 1.5f, -1.0f, 1.0f);
-	glm::mat4 proj = glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, -1.0f, 1.0f); // convert from window space to normal device coordinates (-1, 1)
-	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-100, 0, 0)); // move everything to the left simulating camera moving to the right
-	glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(200, 200, 0));
+	//glm::mat4 proj = glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, -1.0f, 1.0f); // convert from window space to normal device coordinates (-1, 1)
+	//glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-100, 0, 0)); // move everything to the left simulating camera moving to the right
+	//glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(200, 200, 0));
 
-	glm::mat4 mvp = proj * view * model; // these need to be multiplie in reverse order because opengl is in column major (right to left)
+	//glm::mat4 mvp = proj * view * model; // these need to be multiplie in reverse order because opengl is in column major (right to left)
 
 	ShaderProgram basicShader("res/shaders/Basic.Shader");
 	basicShader.Bind();
-	basicShader.SetUniformMat4f("u_MVP", mvp);
+	//basicShader.SetUniformMat4f("u_MVP", mvp);
 	basicShader.SetUniform4f("u_Color", 1.0f, 0.0f, 0.0f, 1.0f);
 	basicShader.UnBind();
 
@@ -94,10 +97,10 @@ int main(void)
 
 	{
 		float positions[] = {
-			 100.0f, 100.0f, 0.0f, 0.0f, // p0 bottom left
-			 200.0f, 100.0f, 1.0f, 0.0f, // p1 bottom right
-			 200.0f, 200.0f, 1.0f, 1.0f, // p2 top right
-			 100.0f, 200.0f, 0.0f, 1.0f, // p3 top left
+			 -50.0f, -50.0f, 0.0f, 0.0f, // p0 bottom left
+			 50.0f, -50.0f, 1.0f, 0.0f, // p1 bottom right
+			 50.0f, 50.0f, 1.0f, 1.0f, // p2 top right
+			 -50.0f, 50.0f, 0.0f, 1.0f, // p3 top left
 		};
 
 		unsigned int indices[] = {
@@ -134,64 +137,108 @@ int main(void)
 		ImGui_ImplGlfw_InitForOpenGL(window, true);
 		ImGui_ImplOpenGL3_Init("#version 330");
 
+		glm::mat4 proj = glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, -1.0f, 1.0f); // convert from window space to normal device coordinates (-1, 1)
+		glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0)); // move everything to the left simulating camera moving to the right
 
+		float cameraH = 0.0f;
+		float cameraV = 0.0f;
+
+		glm::vec3 translationA(200, 200, 0);
+		glm::vec3 translationB(400, 400, 0);
+
+		scene::Scene* currentScene = nullptr;
+		scene::SceneMenu* sceneMenu = new scene::SceneMenu(currentScene);
+		currentScene = sceneMenu;
+
+		sceneMenu->RegisterTest<scene::SceneClearColor>("Clear Color");
+
+		//scene::SceneClearColor clearColor;
 
 		/* Loop until the user closes the window */
 		while (!glfwWindowShouldClose(window))
 		{
+			GLCall(glClearColor(0.0f, 0.0f, 0.0f, 1.0f));
 			renderer.Clear();
+
+			//clearColor.OnUpdate(0.0f);
+			//clearColor.OnRender();
+
 
 			// ImGui setup frame
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-
-			basicShader.Bind();
-			basicShader.SetUniform4f("u_Color", r, 1.0f, 1.0f, 1.0f);
-			renderMode();
-
-			if (r > 1.0f)
-				increment = -0.01f;
-			if (r < 0.0f)
-				increment = 0.01f;
-			r += increment;
-
-			positions[2] = mouseX;
-			positions[3] = mouseY;
-
-
-			double fps = calculateFrameRate();
-
-			/* Render here */
-			glClear(GL_COLOR_BUFFER_BIT);
-			//va.Bind();
-			//ib.Bind();
-			//GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
-			renderer.Draw(va, ib, basicShader);
-
-			static float f = 0.0f;
-			static int counter = 0;
-
-
-			ImGui::Begin("My name  is window");
-			ImGui::Text("FPS: %", frameCount);
-			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-			//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-			ImGui::End();
+			if (currentScene)
+			{
+				currentScene->OnUpdate(0.0f);
+				currentScene->OnRender();
+				ImGui::Begin("Scene");
+				if (currentScene != sceneMenu && ImGui::Button("<-"))
+				{
+					delete currentScene;
+					currentScene = sceneMenu;
+				}
+				currentScene->OnImGuiRender();
+				ImGui::End();
+			}
+			//clearColor.OnImGuiRender();
 
 
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-			/* Swap front and back buffers */
 			glfwSwapBuffers(window);
-
-			/* Poll for and process events */
 			glfwPollEvents();
+
+			//renderMode();
+
+			//double fps = calculateFrameRate();
+
+			/* Render here */
+			//glClear(GL_COLOR_BUFFER_BIT);
+			//basicShader.Bind();
+
+			//{
+			//	glm::mat4 model = glm::translate(glm::mat4(1.0f), translationA);
+			//	glm::mat4 mvp = proj * view * model; // these need to be multiplie in reverse order because opengl is in column major (right to left)
+			//	basicShader.SetUniformMat4f("u_MVP", mvp);
+			//	renderer.Draw(va, ib, basicShader);
+			//}
+			//
+			//{
+			//	glm::mat4 model = glm::translate(glm::mat4(1.0f), translationB);
+			//	glm::mat4 mvp = proj * view * model; // these need to be multiplie in reverse order because opengl is in column major (right to left)
+			//	basicShader.SetUniformMat4f("u_MVP", mvp);
+			//	renderer.Draw(va, ib, basicShader);
+			//}
+
+			//static float f = 0.0f;
+			//static int counter = 0;
+
+
+			//ImGui::Begin("My name  is window");
+			//ImGui::SliderFloat3("Translation A", &translationA.x, 0.0f, (float)WIDTH);            // Edit 1 float using a slider from 0.0f to 1.0f
+			//ImGui::SliderFloat3("Translation B", &translationB.x, 0.0f, (float)WIDTH);            // Edit 1 float using a slider from 0.0f to 1.0f
+			////ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+			//ImGui::End();
+
+
+			//ImGui::Render();
+			//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+			///* Swap front and back buffers */
+			//glfwSwapBuffers(window);
+
+			///* Poll for and process events */
+			//glfwPollEvents();
 		}
 
 		glDeleteProgram(basicShader.shader);
+		delete currentScene;
+
+		if (currentScene != sceneMenu)
+			delete sceneMenu;
 	}
 
 	ImGui_ImplOpenGL3_Shutdown();
